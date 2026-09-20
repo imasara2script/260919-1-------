@@ -1,4 +1,4 @@
-// --- 問題データ定義 (五十音順: a, i, u, e, o の5列) ---
+// --- 問題データ定義 (母音を最上行に配置し、列順を固定: a, i, u, e, o) ---
 const CATEGORIES = {
   boin: { name: "母音(ぼいん)", rows: [
     [
@@ -257,7 +257,8 @@ let currentSession = {
   timerInterval: null,
   elapsedSeconds: 0,
   currentQuestion: null,
-  currentInput: ''
+  currentInput: '',
+  sessionLog: []
 };
 
 function startActiveGame() {
@@ -292,6 +293,7 @@ function startActiveGame() {
   currentSession.currentIndex = 0;
   currentSession.correctCount = 0;
   currentSession.elapsedSeconds = 0;
+  currentSession.sessionLog = [];
   
   showScreen('screen-game');
   currentSession.startTime = Date.now();
@@ -413,18 +415,29 @@ function renderInputArea(mode, correctRoma, correctKana) {
 
 function checkAnswer(userAns, correctAns, isPartial = false) {
   if(isPartial && userAns !== correctAns && !correctAns.startsWith(userAns)) {
-    handleAnswerResult(false, correctAns);
+    handleAnswerResult(false, correctAns, userAns);
     return;
   }
   if(userAns === correctAns) {
-    handleAnswerResult(true, correctAns);
+    handleAnswerResult(true, correctAns, userAns);
   }
 }
 
-function handleAnswerResult(isCorrect, correctAns) {
+function handleAnswerResult(isCorrect, correctAns, userAns = '') {
   clearInterval(currentSession.timerInterval);
   const q = currentSession.currentQuestion;
   
+  let roma = q.roma;
+  if(settings.system === 'kunrei' && q.kunrei) roma = q.kunrei;
+  else if(settings.system === 'hebon' && q.hebon) roma = q.hebon;
+  
+  currentSession.sessionLog.push({
+    kana: q.kana,
+    correctAnswer: currentSession.activeSubMode === 'yomi' ? roma : q.kana,
+    userAnswer: userAns || (isCorrect ? (currentSession.activeSubMode === 'yomi' ? roma : q.kana) : '不正解'),
+    isCorrect: isCorrect
+  });
+
   if(!userRecords[settings.currentUser]) userRecords[settings.currentUser] = {};
   if(!userRecords[settings.currentUser][q.kana]) userRecords[settings.currentUser][q.kana] = [];
   userRecords[settings.currentUser][q.kana].push(isCorrect);
@@ -493,12 +506,42 @@ function endGame() {
   const correct = currentSession.correctCount;
   const accuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
   
+  let modeNameMap = {
+    yomi: "読み",
+    kaki: "書き",
+    fukushu: "復習",
+    random: "ランダム",
+    until_wrong: "間違えるまで"
+  };
+  let catNameMap = {
+    boin: "母音(ぼいん)",
+    shiin: "子音(しいん)",
+    shitsufuji: "しちつふじ",
+    yoon: "拗音(ようおん)",
+    sokuon: "促音(そくおん)"
+  };
+
+  let modeName = modeNameMap[currentSession.playMode] || currentSession.playMode;
+  let stageName = catNameMap[currentSession.categoryKey] || (currentSession.playMode === 'fukushu' || currentSession.playMode === 'random' ? '全般' : currentSession.categoryKey);
+
+  let reviewHtml = `<div class="answer-review-list">`;
+  currentSession.sessionLog.forEach((log) => {
+    let cls = log.isCorrect ? 'correct' : 'incorrect';
+    let icon = log.isCorrect ? '⭕' : '❌';
+    reviewHtml += `<div class="answer-review-item ${cls}">
+      <span>${icon} 問題(${log.kana})</span>
+      <span>正解: ${log.correctAnswer} (あなたの回答: ${log.userAnswer})</span>
+    </div>`;
+  });
+  reviewHtml += `</div>`;
+
   document.getElementById('result-summary').innerHTML = `
     <h3>プレイ終了！</h3>
-    <p>出題数: ${total}問</p>
-    <p>正解数: ${correct}問</p>
-    <p>正解率: ${accuracy}%</p>
+    <p>モード: ${modeName} / ステージ: ${stageName}</p>
+    <p>出題数: ${total}問 | 正解数: ${correct}問 | 正解率: ${accuracy}%</p>
     <p>かかった時間: ${currentSession.elapsedSeconds}秒</p>
+    <h4>今回の回答履歴</h4>
+    ${reviewHtml}
   `;
   
   const now = new Date();
@@ -507,8 +550,8 @@ function endGame() {
     date: dateStr,
     timestamp: now.getTime(),
     user: settings.currentUser,
-    mode: currentSession.playMode,
-    stage: currentSession.categoryKey,
+    mode: modeName,
+    stage: stageName,
     total: total,
     correct: correct,
     accuracy: accuracy,
@@ -527,10 +570,11 @@ function endGame() {
 }
 
 // --- 履歴画面 ---
-let historyViewMode = 'month'; 
+let historyViewMode = 'week'; // 'week' or 'month'
 let historyOffset = 0;
 
 function openHistory() {
+  historyOffset = 0;
   showScreen('screen-history');
   renderHistoryUI();
 }
@@ -549,30 +593,153 @@ function renderHistoryUI() {
       <p>トータル回答数: ${totalAnswers}問</p>
       <p>「間違えるまで」最高記録: ${maxUntilWrong}問</p>
     </div>
+    
     <div class="history-controls">
-      <button class="btn secondary" onclick="shiftHistoryPeriod(-1)">◁</button>
-      <span id="history-period-label">${historyViewMode === 'month' ? '今月' : '直近1週間'}</span>
-      <button class="btn secondary" onclick="shiftHistoryPeriod(1)">▷</button>
+      <div>
+        <button class="btn secondary" style="padding:4px 10px; font-size:0.85rem;" onclick="setHistoryViewMode('week')">1週間</button>
+        <button class="btn secondary" style="padding:4px 10px; font-size:0.85rem;" onclick="setHistoryViewMode('month')">1ヶ月</button>
+      </div>
+      <div>
+        <button class="btn secondary" style="padding:4px 10px;" onclick="shiftHistoryPeriod(-1)">◁</button>
+        <span id="history-period-label" style="font-weight:bold; margin:0 6px;"></span>
+        <button class="btn secondary" style="padding:4px 10px;" onclick="shiftHistoryPeriod(1)">▷</button>
+      </div>
     </div>
+
+    <div class="chart-container">
+      <h4>プレイ回数 & 正解率グラフ</h4>
+      <svg id="history-chart" class="chart-svg" viewBox="0 0 340 140"></svg>
+    </div>
+
     <div class="calendar-grid" id="history-calendar"></div>
+    
     <div class="history-list">
       <h4>プレイ詳細履歴</h4>
   `;
   
   userHist.slice().reverse().forEach(h => {
     html += `<div class="history-item">
-      <span>${h.date} [${h.mode}]</span>
+      <span>${h.date} [${h.mode} / ${h.stage}]</span>
       <span>${h.correct}/${h.total} (${h.accuracy}%) ${h.time}秒</span>
     </div>`;
   });
   html += `</div>`;
   
   container.innerHTML = html;
-  renderCalendar();
+  renderChartAndCalendar();
+}
+
+function setHistoryViewMode(mode) {
+  historyViewMode = mode;
+  historyOffset = 0;
+  renderChartAndCalendar();
 }
 
 function shiftHistoryPeriod(dir) {
   historyOffset += dir;
+  renderChartAndCalendar();
+}
+
+function renderChartAndCalendar() {
+  const userHist = historyData.filter(h => h.user === settings.currentUser);
+  const now = new Date();
+  
+  let labels = [];
+  let counts = [];
+  let accuracies = [];
+  
+  if(historyViewMode === 'week') {
+    let baseDate = new Date();
+    baseDate.setDate(baseDate.getDate() + (historyOffset * 7));
+    document.getElementById('history-period-label').innerText = `${baseDate.getFullYear()}/${baseDate.getMonth()+1}`;
+    
+    for(let i=6; i>=0; i--) {
+      let d = new Date(baseDate);
+      d.setDate(baseDate.getDate() - i);
+      let yStr = `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
+      labels.push(`${d.getMonth()+1}/${d.getDate()}`);
+      
+      let dayHist = userHist.filter(h => h.date.startsWith(yStr));
+      counts.push(dayHist.length);
+      let acc = 0;
+      if(dayHist.length > 0) {
+        let sumAcc = dayHist.reduce((sum, h) => sum + h.accuracy, 0);
+        acc = Math.round(sumAcc / dayHist.length);
+      }
+      accuracies.push(acc);
+    }
+  } else {
+    let year = now.getFullYear();
+    let month = now.getMonth() + historyOffset;
+    let targetDate = new Date(year, month, 1);
+    document.getElementById('history-period-label').innerText = `${targetDate.getFullYear()}/${targetDate.getMonth()+1}`;
+    
+    let daysInMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0).getDate();
+    for(let d=1; d<=daysInMonth; d++) {
+      let yStr = `${targetDate.getFullYear()}/${targetDate.getMonth()+1}/${d}`;
+      labels.push(`${d}`);
+      let dayHist = userHist.filter(h => h.date.startsWith(yStr));
+      counts.push(dayHist.length);
+      let acc = 0;
+      if(dayHist.length > 0) {
+        let sumAcc = dayHist.reduce((sum, h) => sum + h.accuracy, 0);
+        acc = Math.round(sumAcc / dayHist.length);
+      }
+      accuracies.push(acc);
+    }
+  }
+  
+  // グラフSVG描画
+  const svg = document.getElementById('history-chart');
+  if(svg) {
+    let svgHtml = '';
+    const width = 340;
+    const height = 140;
+    const paddingLeft = 30;
+    const paddingRight = 20;
+    const paddingTop = 20;
+    const paddingBottom = 30;
+    
+    const chartWidth = width - paddingLeft - paddingRight;
+    const chartHeight = height - paddingTop - paddingBottom;
+    const step = chartWidth / Math.max(1, labels.length - 1);
+    
+    // グリッド線 & 軸
+    svgHtml += `<line x1="${paddingLeft}" y1="${height-paddingBottom}" x2="${width-paddingRight}" y2="${height-paddingBottom}" stroke="#e5e7eb" stroke-width="1"/>`;
+    svgHtml += `<line x1="${paddingLeft}" y1="${paddingTop}" x2="${width-paddingRight}" y2="${paddingTop}" stroke="#e5e7eb" stroke-width="1"/>`;
+    svgHtml += `<text x="5" y="${paddingTop + 5}" font-size="9" fill="#6b7280">100%</text>`;
+    svgHtml += `<text x="5" y="${height - paddingBottom + 3}" font-size="9" fill="#6b7280">0%</text>`;
+    
+    // 正解率折れ線 (青)
+    let polyPointsAcc = [];
+    accuracies.forEach((acc, idx) => {
+      let x = paddingLeft + idx * step;
+      let y = (height - paddingBottom) - (acc / 100) * chartHeight;
+      polyPointsAcc.push(`${x},${y}`);
+    });
+    if(polyPointsAcc.length > 1) {
+      svgHtml += `<polyline fill="none" stroke="#4f46e5" stroke-width="2" points="${polyPointsAcc.join(' ')}"/>`;
+    }
+    
+    // プレイ回数棒グラフ (緑)
+    let maxCount = Math.max(...counts, 5);
+    counts.forEach((cnt, idx) => {
+      let x = paddingLeft + idx * step - 3;
+      let barH = (cnt / maxCount) * chartHeight;
+      let y = (height - paddingBottom) - barH;
+      svgHtml += `<rect x="${x}" y="${y}" width="6" height="${barH}" fill="#10b981" rx="2" opacity="0.7"/>`;
+    });
+    
+    // 横軸日付ラベル (間引きして表示)
+    labels.forEach((lbl, idx) => {
+      if(labels.length > 15 && idx % 3 !== 0 && idx !== labels.length - 1) return;
+      let x = paddingLeft + idx * step;
+      svgHtml += `<text x="${x}" y="${height - 8}" font-size="9" fill="#6b7280" text-anchor="middle">${lbl}</text>`;
+    });
+    
+    svg.innerHTML = svgHtml;
+  }
+  
   renderCalendar();
 }
 

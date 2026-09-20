@@ -82,7 +82,12 @@
     <div id="screen-result" class="screen">
       <h2>結果発表</h2>
       <div class="result-card" id="result-summary"></div>
-      <button class="btn" onclick="showScreen('screen-top')">トップへ戻る</button>
+      <div class="menu-grid">
+        <button class="btn" onclick="startActiveGame()">リトライ</button>
+        <button class="btn secondary" onclick="showScreen('screen-category-menu')">ステージ選択</button>
+        <button class="btn secondary" onclick="openPlayMenu()">読み書き選択</button>
+        <button class="btn danger" onclick="showScreen('screen-top')">トップへ戻る</button>
+      </div>
     </div>
 
     <!-- 履歴画面 -->

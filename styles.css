@@ -284,12 +284,52 @@ header h1 {
   flex-direction: column;
   gap: 10px;
 }
+.answer-review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+  text-align: left;
+  margin-top: 10px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 10px;
+}
+.answer-review-item {
+  font-size: 0.85rem;
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.answer-review-item.correct {
+  background: #d1fae5;
+  color: #065f46;
+}
+.answer-review-item.incorrect {
+  background: #fee2e2;
+  color: #991b1b;
+}
 
 /* 履歴画面 */
 .history-controls {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-top: 10px;
+}
+.chart-container {
+  background: #f9fafb;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.chart-svg {
+  width: 100%;
+  height: 140px;
 }
 .calendar-grid {
   display: grid;

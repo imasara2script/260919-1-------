@@ -1,4 +1,4 @@
-const CACHE_NAME = 'romaji-pwa-v4';
+const CACHE_NAME = 'romaji-pwa-v7';
 const ASSETS = [
   './index.html',
   './styles.css',
