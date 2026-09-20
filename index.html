@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ローマ字マスター PWA</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="manifest" href="manifest.json">
+</head>
+<body>
+  <div id="app">
+    <div id="effect-overlay"></div>
+    
+    <!-- 共通ヘッダー -->
+    <header>
+      <h1 onclick="showScreen('screen-top')">ローマ字マスター</h1>
+      <button class="back-btn" id="global-back-btn" onclick="showScreen('screen-top')">ホーム</button>
+    </header>
+
+    <!-- トップ画面 -->
+    <div id="screen-top" class="screen active">
+      <div class="top-profile" onclick="openProfileDetail()">
+        <h3 id="display-username">プレイヤー1</h3>
+        <p>連続プレイ日数: <span id="display-streak">1</span>日目 | 最終プレイ: <span id="display-lastplay">なし</span></p>
+        <p style="font-size:0.8rem; color: var(--primary); margin-top:4px;">▶ タップして弱点表を確認</p>
+      </div>
+      
+      <div class="menu-grid">
+        <button class="btn" onclick="openYoshiu()">予習</button>
+        <button class="btn" onclick="openPlayMenu()">プレイ</button>
+        <button class="btn" onclick="openHistory()">履歴</button>
+        <button class="btn" onclick="openSettings()">設定</button>
+        <button class="btn" onclick="openRanking()">ランキング</button>
+      </div>
+    </div>
+
+    <!-- 予習画面 -->
+    <div id="screen-yoshiu" class="screen">
+      <h2>ローマ字一覧 (予習)</h2>
+      <div id="yoshiu-table-container"></div>
+    </div>
+
+    <!-- プレイ選択画面 -->
+    <div id="screen-play-menu" class="screen">
+      <h2>プレイモード選択</h2>
+      <div class="menu-grid">
+        <button class="btn" onclick="selectPlayMode('yomi')">読み</button>
+        <button class="btn" onclick="selectPlayMode('kaki')">書き</button>
+        <button class="btn" onclick="selectPlayMode('fukushu')">復習</button>
+        <button class="btn" onclick="selectPlayMode('random')">ランダム</button>
+        <button class="btn danger" onclick="selectPlayMode('until_wrong')">間違えるまで</button>
+      </div>
+    </div>
+
+    <!-- カテゴリ選択画面 -->
+    <div id="screen-category-menu" class="screen">
+      <h2>ステージ選択</h2>
+      <div class="menu-grid">
+        <button class="btn" onclick="selectCategory('boin')">母音(ぼいん)</button>
+        <button class="btn" onclick="selectCategory('shiin')">子音(しいん)</button>
+        <button class="btn" onclick="selectCategory('shitsufuji')">しちつふじ</button>
+        <button class="btn" onclick="selectCategory('yoon')">拗音(ようおん)</button>
+        <button class="btn" onclick="selectCategory('sokuon')">促音(そくおん)</button>
+      </div>
+    </div>
+
+    <!-- ゲーム画面 -->
+    <div id="screen-game" class="screen">
+      <div class="game-header">
+        <span id="game-progress">1問目 / 全10問</span>
+        <span id="game-accuracy">正解率: 100%</span>
+        <span id="game-time">0秒</span>
+      </div>
+      <div class="question-box">
+        <div class="question-prompt" id="question-prompt">次のひらがなのローマ字は？</div>
+        <div class="question-target" id="question-target">あ</div>
+      </div>
+      <div id="input-area-container"></div>
+    </div>
+
+    <!-- 結果画面 -->
+    <div id="screen-result" class="screen">
+      <h2>結果発表</h2>
+      <div class="result-card" id="result-summary"></div>
+      <button class="btn" onclick="showScreen('screen-top')">トップへ戻る</button>
+    </div>
+
+    <!-- 履歴画面 -->
+    <div id="screen-history" class="screen">
+      <h2>プレイ履歴</h2>
+      <div id="history-content"></div>
+    </div>
+
+    <!-- 設定画面 -->
+    <div id="screen-settings" class="screen">
+      <h2>設定</h2>
+      <div class="setting-group">
+        <label>ユーザー</label>
+        <div class="setting-row">
+          <select id="setting-user-select" onchange="changeUser()"></select>
+          <button type="button" class="btn secondary" style="padding:8px;" onclick="addNewUser()">追加</button>
+        </div>
+        <div class="setting-row" style="margin-top:4px;">
+          <button type="button" class="btn secondary" style="font-size:0.9rem; padding:8px;" onclick="renameUser()">改名</button>
+          <button type="button" class="btn danger" style="font-size:0.9rem; padding:8px;" onclick="deleteUser()">削除</button>
+        </div>
+      </div>
+
+      <div class="setting-group">
+        <label>方式</label>
+        <select id="setting-system" onchange="updateSettingsFromUI()">
+          <option value="hebon">ヘボン式</option>
+          <option value="kunrei">訓令式</option>
+        </select>
+      </div>
+
+      <div class="setting-group">
+        <label>出題レベル</label>
+        <select id="setting-level" onchange="updateSettingsFromUI()">
+          <option value="0">0：二択</option>
+          <option value="1">1：三択</option>
+          <option value="2">2：仮想キーボードで回答</option>
+          <option value="3">3：OS標準のキーボードで回答</option>
+        </select>
+      </div>
+
+      <div class="setting-group">
+        <label>1ステージの出題数</label>
+        <input type="number" id="setting-stagesize" min="1" max="50" onchange="updateSettingsFromUI()">
+      </div>
+
+      <div class="setting-group">
+        <label>バックアップ / 復元</label>
+        <div class="setting-row">
+          <button type="button" class="btn secondary" onclick="exportData()">バックアップ保存</button>
+          <input type="file" id="import-file" style="display:none" onchange="importData(event)">
+          <button type="button" class="btn secondary" onclick="document.getElementById('import-file').click()">復元</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ランキング画面 -->
+    <div id="screen-ranking" class="screen">
+      <h2>ユーザー別ランキング</h2>
+      <div class="ranking-list" id="ranking-container"></div>
+    </div>
+
+    <!-- プロフィール詳細 (弱点) 画面 -->
+    <div id="screen-profile-detail" class="screen">
+      <h2 id="profile-detail-title">弱点分析</h2>
+      <p style="font-size:0.85rem; color:var(--text-light)">直近10回分の正答率が表示されます。</p>
+      <div id="profile-table-container"></div>
+    </div>
+
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
